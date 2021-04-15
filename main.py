@@ -19,10 +19,11 @@ def preprocess(data_csv):
 
 def kNN(df):
     """Code for applying k-Nearest Neighbours algorithm"""
-    y = df[['explicit']]  # Treat explicit column as labels for the classifier
-    X = df.drop(['explicit'])  # Drop the column from the main data
+    labels = df[['explicit']]  # Treat explicit column as labels for the classifier
+    samples = df.drop(['explicit'], axis=1)  # Drop the column from the main data
 
 
 data = "./archive/data.csv"
 cleanedData = preprocess(data)
+# add KFold here
 kNN(cleanedData)

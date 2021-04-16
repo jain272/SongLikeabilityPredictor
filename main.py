@@ -19,7 +19,7 @@ def preprocess(data_csv):
     return dfSample
 
 
-def kNN(training, validation, labelname, k):
+def trainkNN(training, labelname, k):
     # split training data into labels and samples
     explicitLabel = training[[labelname]].to_numpy().reshape(len(training))
     explicitsample = training.drop([labelname], axis=1)
@@ -28,21 +28,12 @@ def kNN(training, validation, labelname, k):
     knc = KNeighborsClassifier(n_neighbors=k)
     knc.fit(explicitsample, explicitLabel)
 
-    # get samples from validation data
-    explicitsample = validation.drop([labelname], axis=1)
-
-    # get predictions based on validation samples
-    predictions = pd.DataFrame(knc.predict(explicitsample), columns=[labelname])
-
-    # create new array with 1's for each correct prediction and 0's for incorrect
-    accuracy = np.where(validation[labelname].reset_index(drop=True) == predictions[labelname], 1, 0)
-
     # return accuracy and model
-    return accuracy.sum()/len(accuracy), knc
+    return knc
 
 
 # TODO: TUNING
-def decisionTree(training, validation, labelname):
+def trainDecisionTree(training, labelname):
     # split training data into labels and samples
     explicitLabel = training[[labelname]].to_numpy().reshape(len(training))
     explicitsample = training.drop([labelname], axis=1)
@@ -51,43 +42,58 @@ def decisionTree(training, validation, labelname):
     dtc = DecisionTreeClassifier()
     dtc.fit(explicitsample, explicitLabel)
 
+    # return model
+    return dtc
+
+
+def validate(model, validation, labelname):
     # get samples from validation data
     explicitsample = validation.drop([labelname], axis=1)
 
     # get predictions based on validation samples
-    predictions = pd.DataFrame(dtc.predict(explicitsample), columns=[labelname])
+    predictions = pd.DataFrame(model.predict(explicitsample), columns=[labelname])
+
     # create new array with 1's for each correct prediction and 0's for incorrect
     accuracy = np.where(validation[labelname].reset_index(drop=True) == predictions[labelname], 1, 0)
 
-    # return accuracy and model
-    return accuracy.sum()/len(accuracy), dtc
+    return accuracy.sum()/len(accuracy)
+
+
+def train(cleanedData):
+    knnlabel = 'explicit'
+    dtclabel = 'mode'
+    knnmaxacc = dtcmaxacc = 0
+    knnbest = dtcbest = None
+    nfolds = 10
+    n = len(cleanedData)
+
+    for i in range(0, n, int(n/nfolds)):
+        j = i+int(n/nfolds)
+
+        # get consecutive entries of proper size
+        validationset = cleanedData.iloc[i:j]
+
+        # drop entries in validation ser from training set
+        trainingset = cleanedData.drop(validationset.isin(cleanedData).index)
+
+        # train knn and save most accurate model
+        currmodel = trainkNN(trainingset, knnlabel, 10)
+        accuracy = validate(currmodel, validationset, knnlabel)
+        if accuracy > knnmaxacc:
+            knnmaxacc = accuracy
+            bestknn = currmodel
+
+        # train decision tree and save most accurate model
+        currmodel = trainDecisionTree(trainingset, dtclabel)
+        accuracy = validate(currmodel, validationset, dtclabel)
+        if accuracy > dtcmaxacc:
+            dtcmaxacc = accuracy
+            bestdtc = currmodel
+    return bestknn, bestdtc
 
 
 data = "./archive/data.csv"
 cleanedData = preprocess(data)
+knn, dtc = train(cleanedData)
 
-knnmaxacc = dtcmaxacc = 0
-knnbest = dtcbest = None
-nfolds = 10
-n = len(cleanedData)
-
-for i in range(0, n, int(n/nfolds)):
-    j = i+int(n/nfolds)
-
-    # get consecutive entries of proper size
-    validationset = cleanedData.iloc[i:j]
-
-    # drop entries in validation ser from training set
-    trainingset = cleanedData.drop(validationset.isin(cleanedData).index)
-
-    # train knn and save most accurate model
-    accuracy, currmodel = kNN(trainingset, validationset, 'explicit', 10)
-    if accuracy > knnmaxacc:
-        knnmaxacc = accuracy
-        bestknn = currmodel
-
-    # train decision tree and save most accurate model
-    accuracy, currmodel = decisionTree(trainingset, validationset, 'mode')
-    if accuracy > dtcmaxacc:
-        dtcmaxacc = accuracy
-        bestdtc = currmodel
+testdata = preprocess(data)

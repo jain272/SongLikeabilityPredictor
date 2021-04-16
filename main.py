@@ -3,6 +3,7 @@
 # Authors: Jatin Jain
 
 import pandas as pd
+import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 
 
@@ -17,13 +18,33 @@ def preprocess(data_csv):
     return dfSample
 
 
-def kNN(df):
+def kNN(training, validation, k):
     """Code for applying k-Nearest Neighbours algorithm"""
-    labels = df[['explicit']]  # Treat explicit column as labels for the classifier
-    samples = df.drop(['explicit'], axis=1)  # Drop the column from the main data
+    explicitLabel = training[['explicit']].to_numpy().reshape(len(training))
+    explicitsample = training.drop(['explicit'], axis=1)
+    neigh = KNeighborsClassifier(n_neighbors=k)
+    neigh.fit(explicitsample, explicitLabel)
+    explicitsample = validation.drop(['explicit'], axis=1)
+    predictions = pd.DataFrame(neigh.predict(explicitsample), columns=['explicit'])
+    accuracy = np.where(validation['explicit'].reset_index(drop=True) == predictions['explicit'], 1, 0)
+    return accuracy.sum()/len(accuracy), neigh
 
 
 data = "./archive/data.csv"
 cleanedData = preprocess(data)
-# add KFold here
-kNN(cleanedData)
+
+maxacc = 0
+bestknn = None
+nfolds = 10
+for i in range(0, 1000, 100):
+    j = i+int(1000/nfolds)
+    validationset = cleanedData.iloc[i:j]
+    trainingset = cleanedData.drop(validationset.isin(cleanedData).index)
+    accuracy, knnmodel = kNN(trainingset, validationset, 10)
+    print(accuracy)
+    if accuracy > maxacc:
+        bestknn = maxacc
+"""
+modelabel = cleanedData[['mode']]
+modesample = cleanedData.drop(['mode'], axis=1)"""
+

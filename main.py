@@ -77,7 +77,7 @@ def train(cleanedData):
         trainingset = cleanedData.drop(validationset.isin(cleanedData).index)
 
         # train knn and save most accurate model
-        currmodel = trainkNN(trainingset, knnlabel, 10)
+        currmodel = trainkNN(trainingset, knnlabel, 20)
         accuracy = validate(currmodel, validationset, knnlabel)
         if accuracy > knnmaxacc:
             knnmaxacc = accuracy
@@ -97,3 +97,7 @@ cleanedData = preprocess(data)
 knn, dtc = train(cleanedData)
 
 testdata = preprocess(data)
+print('dtc')
+print(validate(dtc, testdata, 'mode'))
+print('knn')
+print(validate(knn, testdata, 'explicit'))

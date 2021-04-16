@@ -63,7 +63,7 @@ def train(cleanedData):
     knnlabel = 'explicit'
     dtclabel = 'mode'
     knnmaxacc = dtcmaxacc = 0
-    knnbest = dtcbest = None
+    bestknn = bestdtc = None
     nfolds = 10
     n = len(cleanedData)
 

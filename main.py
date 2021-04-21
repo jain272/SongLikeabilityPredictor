@@ -1,9 +1,11 @@
 # This file contains code required for the preprocessing of data and
 # the k-Nearest Neighbours algorithm where k is hyperparameter that will be tuned
-# Authors: Jatin Jain
+# Authors: Jatin Jain, Gavin Williams
 
 import pandas as pd
+import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
 
 
 def preprocess(data_csv):
@@ -17,12 +19,85 @@ def preprocess(data_csv):
     return dfSample
 
 
-def kNN(df):
-    """Code for applying k-Nearest Neighbours algorithm"""
-    y = df[['explicit']]  # Treat explicit column as labels for the classifier
-    X = df.drop(['explicit'])  # Drop the column from the main data
+def trainkNN(training, labelname, k):
+    # split training data into labels and samples
+    explicitLabel = training[[labelname]].to_numpy().reshape(len(training))
+    explicitsample = training.drop([labelname], axis=1)
+
+    # train knn
+    knc = KNeighborsClassifier(n_neighbors=k)
+    knc.fit(explicitsample, explicitLabel)
+
+    # return accuracy and model
+    return knc
+
+
+# TODO: TUNING
+def trainDecisionTree(training, labelname):
+    # split training data into labels and samples
+    explicitLabel = training[[labelname]].to_numpy().reshape(len(training))
+    explicitsample = training.drop([labelname], axis=1)
+
+    # train decision tree
+    dtc = DecisionTreeClassifier()
+    dtc.fit(explicitsample, explicitLabel)
+
+    # return model
+    return dtc
+
+
+def validate(model, validation, labelname):
+    # get samples from validation data
+    explicitsample = validation.drop([labelname], axis=1)
+
+    # get predictions based on validation samples
+    predictions = pd.DataFrame(model.predict(explicitsample), columns=[labelname])
+
+    # create new array with 1's for each correct prediction and 0's for incorrect
+    accuracy = np.where(validation[labelname].reset_index(drop=True) == predictions[labelname], 1, 0)
+
+    return accuracy.sum()/len(accuracy)
+
+
+def train(cleanedData):
+    knnlabel = 'explicit'
+    dtclabel = 'mode'
+    knnmaxacc = dtcmaxacc = 0
+    bestknn = bestdtc = None
+    nfolds = 10
+    n = len(cleanedData)
+
+    for i in range(0, n, int(n/nfolds)):
+        j = i+int(n/nfolds)
+
+        # get consecutive entries of proper size
+        validationset = cleanedData.iloc[i:j]
+
+        # drop entries in validation ser from training set
+        trainingset = cleanedData.drop(validationset.isin(cleanedData).index)
+
+        # train knn and save most accurate model
+        currmodel = trainkNN(trainingset, knnlabel, 20)
+        accuracy = validate(currmodel, validationset, knnlabel)
+        if accuracy > knnmaxacc:
+            knnmaxacc = accuracy
+            bestknn = currmodel
+
+        # train decision tree and save most accurate model
+        currmodel = trainDecisionTree(trainingset, dtclabel)
+        accuracy = validate(currmodel, validationset, dtclabel)
+        if accuracy > dtcmaxacc:
+            dtcmaxacc = accuracy
+            bestdtc = currmodel
+    return bestknn, bestdtc
 
 
 data = "./archive/data.csv"
 cleanedData = preprocess(data)
-kNN(cleanedData)
+knn, dtc = train(cleanedData)
+
+testdata = preprocess(data)
+print('dtc')
+print(validate(dtc, testdata, 'mode'))
+print('knn')
+print(validate(knn, testdata, 'explicit'))

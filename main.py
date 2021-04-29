@@ -4,6 +4,7 @@
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 
@@ -56,7 +57,48 @@ def validate(model, validation, labelname):
     # create new array with 1's for each correct prediction and 0's for incorrect
     accuracy = np.where(validation[labelname].reset_index(drop=True) == predictions[labelname], 1, 0)
 
-    return accuracy.sum()/len(accuracy)
+    return accuracy.sum() / len(accuracy)
+
+
+def samplevsaccuracy(cleanedData):
+    numsampleslistknn = []  # list with number of samples for KNN
+    accuracylistknn = []  # list with corresponding accuracies for number of samples for KNN
+    numsampleslistdtc = []  # list with number of samples for Decision Trees
+    accuracylistdtc = []  # list with corresponding accuracies for number of samples for Decision Trees
+
+    fixedvalset = cleanedData.sample(n=100)  # Get 100 random cleaned samples with labels
+
+    # Drop the validation data points from total data
+    trainingsetall = cleanedData.drop(fixedvalset.isin(cleanedData).index)
+
+    for count in range(1, 10):
+        # Get data points for training, increasing each time by 100 samples
+        trainingset = trainingsetall.sample(n=(count * 100))
+
+        # Train the KNN and Decision Tree on the training set for current iteration
+        bestknn, bestdtc = train(trainingset)
+
+        # Obtain accuracy for knn classifier on the given dataset
+        accuracyknn = validate(bestknn, fixedvalset, 'explicit')
+        accuracydtc = validate(bestdtc, fixedvalset, 'mode')
+
+        # Append the number of samples and corresponding accuracies to the corresponding lists
+        numsampleslistknn.append(len(trainingset))
+        numsampleslistdtc.append(len(trainingset))
+        accuracylistknn.append(accuracyknn)
+        accuracylistdtc.append(accuracydtc)
+
+    # Plot corresponding lists for the accuracy vs sample plots
+    plt.plot(numsampleslistknn, accuracylistknn)
+    plt.xlabel('Number of Samples')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy vs Sample Plot for K-Nearest Neighbors')
+    plt.show()
+    plt.plot(numsampleslistdtc, accuracylistdtc)
+    plt.xlabel('Number of Samples')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy vs Sample Plot for Decision Trees')
+    plt.show()
 
 
 def train(cleanedData):
@@ -67,8 +109,8 @@ def train(cleanedData):
     nfolds = 10
     n = len(cleanedData)
 
-    for i in range(0, n, int(n/nfolds)):
-        j = i+int(n/nfolds)
+    for i in range(0, n, int(n / nfolds)):
+        j = i + int(n / nfolds)
 
         # get consecutive entries of proper size
         validationset = cleanedData.iloc[i:j]
@@ -77,7 +119,7 @@ def train(cleanedData):
         trainingset = cleanedData.drop(validationset.isin(cleanedData).index)
 
         # train knn and save most accurate model
-        currmodel = trainkNN(trainingset, knnlabel, 20)
+        currmodel = trainkNN(trainingset, knnlabel, 5)
         accuracy = validate(currmodel, validationset, knnlabel)
         if accuracy > knnmaxacc:
             knnmaxacc = accuracy
@@ -101,3 +143,5 @@ print('dtc')
 print(validate(dtc, testdata, 'mode'))
 print('knn')
 print(validate(knn, testdata, 'explicit'))
+
+samplevsaccuracy(cleanedData)

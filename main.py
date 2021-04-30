@@ -1,5 +1,8 @@
 # This file contains code required for the preprocessing of data and
 # the k-Nearest Neighbours algorithm where k is hyperparameter that will be tuned
+# It also contains the training of the decision tree classifier and a function
+# that calculates the accuracy of the trained classifier and a function that can plot the
+# Accuracy vs. Sample Plots for both the classifiers.
 # Authors: Jatin Jain, Gavin Williams
 
 import pandas as pd
@@ -21,6 +24,7 @@ def preprocess(data_csv):
 
 
 def trainkNN(training, labelname, k):
+    """Code for training the K-Nearest Neighbors classifier"""
     # split training data into labels and samples
     explicitLabel = training[[labelname]].to_numpy().reshape(len(training))
     explicitsample = training.drop([labelname], axis=1)
@@ -35,6 +39,7 @@ def trainkNN(training, labelname, k):
 
 # TODO: TUNING
 def trainDecisionTree(training, labelname):
+    """Code for training the Decision Tree classifier"""
     # split training data into labels and samples
     explicitLabel = training[[labelname]].to_numpy().reshape(len(training))
     explicitsample = training.drop([labelname], axis=1)
@@ -48,6 +53,7 @@ def trainDecisionTree(training, labelname):
 
 
 def validate(model, validation, labelname):
+    """Code for obtaining the accuracy of any trained classifier"""
     # get samples from validation data
     explicitsample = validation.drop([labelname], axis=1)
 
@@ -61,6 +67,7 @@ def validate(model, validation, labelname):
 
 
 def samplevsaccuracy(cleanedData):
+    """Code for plotting the Accuracy vs Sample Plots for both classifiers"""
     numsampleslistknn = []  # list with number of samples for KNN
     accuracylistknn = []  # list with corresponding accuracies for number of samples for KNN
     numsampleslistdtc = []  # list with number of samples for Decision Trees
@@ -102,6 +109,7 @@ def samplevsaccuracy(cleanedData):
 
 
 def train(cleanedData):
+    """Umbrella function for the training process"""
     knnlabel = 'explicit'
     dtclabel = 'mode'
     knnmaxacc = dtcmaxacc = 0

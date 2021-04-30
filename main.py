@@ -107,6 +107,7 @@ def samplevsaccuracy(cleanedData):
     plt.title('Accuracy vs Sample Plot for Decision Trees')
     plt.show()
 
+
 def ROC(model, validation, label):
     """Code for obtaining the accuracy of any trained classifier"""
     # get samples from validation data
@@ -119,10 +120,10 @@ def ROC(model, validation, label):
     accuracy = np.where(validation[label].reset_index(drop=True) == predictions[label], 1, 0)
 
     # true positives, true negatives, false positives, false negatives
-    tp = np.where((validation[label].reset_index(drop=True) == predictions[label]) & (predictions[label] == 1), 1, 0).sum()
-    tn = np.where((validation[label].reset_index(drop=True) == predictions[label]) & (predictions[label] == 0), 1, 0).sum()
-    fp = np.where((validation[label].reset_index(drop=True) != predictions[label]) & (predictions[label] == 1), 1, 0).sum()
-    fn = np.where((validation[label].reset_index(drop=True) != predictions[label]) & (predictions[label] == 0), 1, 0).sum()
+    tp = np.where((validation[label].reset_index(drop=True) == 1) & (predictions[label] == 1), 1, 0).sum()
+    tn = np.where((validation[label].reset_index(drop=True) == 0) & (predictions[label] == 0), 1, 0).sum()
+    fp = np.where((validation[label].reset_index(drop=True) != 0) & (predictions[label] == 1), 1, 0).sum()
+    fn = np.where((validation[label].reset_index(drop=True) != 1) & (predictions[label] == 0), 1, 0).sum()
 
     # true positive rate
     tpr = tp/(tp+fn)
@@ -131,13 +132,12 @@ def ROC(model, validation, label):
 
     return tpr, fpr
 
-def train(cleanedData):
+
+def train(cleanedData, nfolds, knnlabel, dtclabel):
     """Umbrella function for the training process"""
-    knnlabel = 'explicit'
-    dtclabel = 'mode'
     knnmaxacc = dtcmaxacc = 0
     bestknn = bestdtc = None
-    nfolds = 10
+
     n = len(cleanedData)
 
     for i in range(0, n, int(n / nfolds)):
@@ -150,7 +150,7 @@ def train(cleanedData):
         trainingset = cleanedData.drop(validationset.isin(cleanedData).index)
 
         # train knn and save most accurate model
-        currmodel = trainkNN(trainingset, knnlabel, 5)
+        currmodel = trainkNN(trainingset, knnlabel, 1)
         accuracy = validate(currmodel, validationset, knnlabel)
         if accuracy > knnmaxacc:
             knnmaxacc = accuracy
@@ -162,12 +162,14 @@ def train(cleanedData):
         if accuracy > dtcmaxacc:
             dtcmaxacc = accuracy
             bestdtc = currmodel
+    # Plot corresponding lists for the accuracy vs sample plots
+
     return bestknn, bestdtc
 
 
 data = "./archive/data.csv"
 cleanedData = preprocess(data)
-knn, dtc = train(cleanedData)
+knn, dtc = train(cleanedData, 10, 'explicit', 'mode')
 
 testdata = preprocess(data)
 print('dtc')
@@ -175,4 +177,20 @@ print(validate(dtc, testdata, 'mode'))
 print('knn')
 print(validate(knn, testdata, 'explicit'))
 
-ROC(knn, testdata, 'explicit')
+knntpr = []
+knnfpr = []
+
+n = len(testdata)
+nfolds = 10
+
+for i in range(0, n, int(n / nfolds)):
+    j = i + int(n / nfolds)
+    tpr, fpr = ROC(knn, testdata.iloc[i:j], 'explicit')
+    knntpr.append(tpr)
+    knnfpr.append(fpr)
+
+plt.plot(knnfpr, knntpr, 'ro')
+plt.xlabel('FPR')
+plt.ylabel('TPR')
+plt.title('KNN ROC')
+plt.show()

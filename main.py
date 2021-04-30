@@ -107,6 +107,29 @@ def samplevsaccuracy(cleanedData):
     plt.title('Accuracy vs Sample Plot for Decision Trees')
     plt.show()
 
+def ROC(model, validation, label):
+    """Code for obtaining the accuracy of any trained classifier"""
+    # get samples from validation data
+    explicitsample = validation.drop([label], axis=1)
+
+    # get predictions based on validation samples
+    predictions = pd.DataFrame(model.predict(explicitsample), columns=[label])
+
+    # create new array with 1's for each correct prediction and 0's for incorrect
+    accuracy = np.where(validation[label].reset_index(drop=True) == predictions[label], 1, 0)
+
+    # true positives, true negatives, false positives, false negatives
+    tp = np.where((validation[label].reset_index(drop=True) == predictions[label]) & (predictions[label] == 1), 1, 0).sum()
+    tn = np.where((validation[label].reset_index(drop=True) == predictions[label]) & (predictions[label] == 0), 1, 0).sum()
+    fp = np.where((validation[label].reset_index(drop=True) != predictions[label]) & (predictions[label] == 1), 1, 0).sum()
+    fn = np.where((validation[label].reset_index(drop=True) != predictions[label]) & (predictions[label] == 0), 1, 0).sum()
+
+    # true positive rate
+    tpr = tp/(tp+fn)
+
+    fpr = fp/(fp+tn)
+
+    return tpr, fpr
 
 def train(cleanedData):
     """Umbrella function for the training process"""
@@ -152,4 +175,4 @@ print(validate(dtc, testdata, 'mode'))
 print('knn')
 print(validate(knn, testdata, 'explicit'))
 
-samplevsaccuracy(cleanedData)
+ROC(knn, testdata, 'explicit')

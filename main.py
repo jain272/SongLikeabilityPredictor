@@ -38,14 +38,14 @@ def trainkNN(training, labelname, k):
 
 
 # TODO: TUNING
-def trainDecisionTree(training, labelname):
+def trainDTC(training, labelname, depth):
     """Code for training the Decision Tree classifier"""
     # split training data into labels and samples
     explicitLabel = training[[labelname]].to_numpy().reshape(len(training))
     explicitsample = training.drop([labelname], axis=1)
 
     # train decision tree
-    dtc = DecisionTreeClassifier()
+    dtc = DecisionTreeClassifier(max_depth=depth)
     dtc.fit(explicitsample, explicitLabel)
 
     # return model
@@ -66,7 +66,7 @@ def validate(model, validation, labelname):
     return accuracy.sum() / len(accuracy)
 
 
-def samplevsaccuracy(cleanedData):
+def samplevsaccuracy(cleanedData, nfolds, knnlabel, dtclabel):
     """Code for plotting the Accuracy vs Sample Plots for both classifiers"""
     numsampleslistknn = []  # list with number of samples for KNN
     accuracylistknn = []  # list with corresponding accuracies for number of samples for KNN
@@ -83,7 +83,7 @@ def samplevsaccuracy(cleanedData):
         trainingset = trainingsetall.sample(n=(count * 100))
 
         # Train the KNN and Decision Tree on the training set for current iteration
-        bestknn, bestdtc = train(trainingset)
+        bestknn, bestdtc = train(trainingset, nfolds, knnlabel, dtclabel)
 
         # Obtain accuracy for knn classifier on the given dataset
         accuracyknn = validate(bestknn, fixedvalset, 'explicit')
@@ -96,15 +96,18 @@ def samplevsaccuracy(cleanedData):
         accuracylistdtc.append(accuracydtc)
 
     # Plot corresponding lists for the accuracy vs sample plots
-    plt.plot(numsampleslistknn, accuracylistknn)
-    plt.xlabel('Number of Samples')
-    plt.ylabel('Accuracy')
-    plt.title('Accuracy vs Sample Plot for K-Nearest Neighbors')
-    plt.show()
-    plt.plot(numsampleslistdtc, accuracylistdtc)
-    plt.xlabel('Number of Samples')
-    plt.ylabel('Accuracy')
-    plt.title('Accuracy vs Sample Plot for Decision Trees')
+    plot(numsampleslistknn, accuracylistknn, 'Number of Samples', 'Accuracy', 'Accuracy vs Sample Plot for KNN', False)
+    plot(numsampleslistdtc, accuracylistdtc, 'Number of Samples', 'Accuracy', 'Accuracy vs Sample Plot for DTC', False)
+
+
+def plot(x, y, xlab, ylab, title, point):
+    if point:
+        plt.plot(x, y, 'ro')
+    else:
+        plt.plot(x, y)
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    plt.title(title)
     plt.show()
 
 
@@ -132,6 +135,19 @@ def ROC(model, validation, label):
 
     return tpr, fpr
 
+def ROCplot(model, testdata, label, nfolds, modelname):
+    rtpr = []
+    rfpr = []
+
+    n = len(testdata)
+    for i in range(0, n, int(n / nfolds)):
+        j = i + int(n / nfolds)
+        tpr, fpr = ROC(model, testdata.iloc[i:j], label)
+        rtpr.append(tpr)
+        rfpr.append(fpr)
+
+    plot(rfpr, rtpr, 'fpr', 'tpr', modelname, True)
+
 
 def train(cleanedData, nfolds, knnlabel, dtclabel):
     """Umbrella function for the training process"""
@@ -149,19 +165,21 @@ def train(cleanedData, nfolds, knnlabel, dtclabel):
         # drop entries in validation ser from training set
         trainingset = cleanedData.drop(validationset.isin(cleanedData).index)
 
-        # train knn and save most accurate model
-        currmodel = trainkNN(trainingset, knnlabel, 1)
-        accuracy = validate(currmodel, validationset, knnlabel)
-        if accuracy > knnmaxacc:
-            knnmaxacc = accuracy
-            bestknn = currmodel
+        for c in range(1, nfolds+1):
+            # train knn and save most accurate model
+            currmodel = trainkNN(trainingset, knnlabel, 5*c)
+            accuracy = validate(currmodel, validationset, knnlabel)
+            if accuracy > knnmaxacc:
+                knnmaxacc = accuracy
+                bestknn = currmodel
 
-        # train decision tree and save most accurate model
-        currmodel = trainDecisionTree(trainingset, dtclabel)
-        accuracy = validate(currmodel, validationset, dtclabel)
-        if accuracy > dtcmaxacc:
-            dtcmaxacc = accuracy
-            bestdtc = currmodel
+        for c in range(1, nfolds+1):
+            # train decision tree and save most accurate model
+            currmodel = trainDTC(trainingset, dtclabel, 5*c)
+            accuracy = validate(currmodel, validationset, dtclabel)
+            if accuracy > dtcmaxacc:
+                dtcmaxacc = accuracy
+                bestdtc = currmodel
     # Plot corresponding lists for the accuracy vs sample plots
 
     return bestknn, bestdtc
@@ -177,20 +195,8 @@ print(validate(dtc, testdata, 'mode'))
 print('knn')
 print(validate(knn, testdata, 'explicit'))
 
-knntpr = []
-knnfpr = []
+samplevsaccuracy(testdata, 10, 'explicit', 'mode')
+ROCplot(knn, testdata, 'explicit', 10, 'KNN')
+ROCplot(dtc, testdata, 'mode', 10, 'DTC')
 
-n = len(testdata)
-nfolds = 10
 
-for i in range(0, n, int(n / nfolds)):
-    j = i + int(n / nfolds)
-    tpr, fpr = ROC(knn, testdata.iloc[i:j], 'explicit')
-    knntpr.append(tpr)
-    knnfpr.append(fpr)
-
-plt.plot(knnfpr, knntpr, 'ro')
-plt.xlabel('FPR')
-plt.ylabel('TPR')
-plt.title('KNN ROC')
-plt.show()

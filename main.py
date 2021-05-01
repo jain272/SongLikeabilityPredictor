@@ -100,6 +100,7 @@ def samplevsaccuracy(cleanedData, nfolds, knnlabel, dtclabel):
     plot(numsampleslistdtc, accuracylistdtc, 'Number of Samples', 'Accuracy', 'Accuracy vs Sample Plot for DTC', False)
 
 
+# plotting helper function
 def plot(x, y, xlab, ylab, title, point):
     if point:
         plt.plot(x, y, 'ro')
@@ -111,16 +112,9 @@ def plot(x, y, xlab, ylab, title, point):
     plt.show()
 
 
-def ROC(model, validation, label):
-    """Code for obtaining the accuracy of any trained classifier"""
-    # get samples from validation data
-    explicitsample = validation.drop([label], axis=1)
-
-    # get predictions based on validation samples
-    predictions = pd.DataFrame(model.predict(explicitsample), columns=[label])
-
-    # create new array with 1's for each correct prediction and 0's for incorrect
-    accuracy = np.where(validation[label].reset_index(drop=True) == predictions[label], 1, 0)
+def ROC(validation, predictions, label, threshold):
+    # get indices which fall above threshold
+    predictions = pd.DataFrame(np.where(predictions[1] >= threshold, 1, 0), columns=[label])
 
     # true positives, true negatives, false positives, false negatives
     tp = np.where((validation[label].reset_index(drop=True) == 1) & (predictions[label] == 1), 1, 0).sum()
@@ -129,30 +123,37 @@ def ROC(model, validation, label):
     fn = np.where((validation[label].reset_index(drop=True) == 1) & (predictions[label] == 0), 1, 0).sum()
 
     # true positive rate
-    tpr = tp/(tp+fn)
+    tpr = (tp+1)/(tp+fn+1)
 
-    fpr = fp/(fp+tn)
+    # false positive rate
+    fpr = (fp+1)/(fp+tn+1)
 
     return tpr, fpr
 
 
+<<<<<<< HEAD
+def ROCplot(actual, predicted, label, thresholds):
+=======
 def ROCplot(model, testdata, label, nfolds, modelname):
+>>>>>>> origin/ROC
     rtpr = []
     rfpr = []
 
-    n = len(testdata)
-    for i in range(0, n, int(n / nfolds)):
-        j = i + int(n / nfolds)
-        tpr, fpr = ROC(model, testdata.iloc[i:j], label)
+    for threshold in thresholds:
+        tpr, fpr = ROC(actual, predicted, label, threshold)
         rtpr.append(tpr)
         rfpr.append(fpr)
 
+<<<<<<< HEAD
+    return rtpr, rfpr
+=======
     plt.plot(rfpr, rtpr, color='red', label='ROC')
     plt.plot([0, 1], [0, 1], color='blue', linestyle='--')
     plt.xlabel('fpr')
     plt.ylabel('tpr')
     plt.title(modelname)
     plt.show()
+>>>>>>> origin/ROC
 
 
 def train(cleanedData, nfolds, knnlabel, dtclabel):
@@ -171,6 +172,7 @@ def train(cleanedData, nfolds, knnlabel, dtclabel):
         # drop entries in validation ser from training set
         trainingset = cleanedData.drop(validationset.isin(cleanedData).index)
 
+        # tune K, begin at 5 and go to 50 in increments of 5
         for c in range(1, nfolds+1):
             # train knn and save most accurate model
             currmodel = trainkNN(trainingset, knnlabel, 5*c)
@@ -179,6 +181,7 @@ def train(cleanedData, nfolds, knnlabel, dtclabel):
                 knnmaxacc = accuracy
                 bestknn = currmodel
 
+        # tune max depth, begin at 5 and go to 50 by 5
         for c in range(1, nfolds+1):
             # train decision tree and save most accurate model
             currmodel = trainDTC(trainingset, dtclabel, 5*c)
@@ -192,19 +195,67 @@ def train(cleanedData, nfolds, knnlabel, dtclabel):
 
 # get data
 data = "./archive/data.csv"
+<<<<<<< HEAD
+dtclabel = 'mode'
+knnlabel ='explicit'
+kfold = 10
+thresholds = [0, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1]
+=======
+>>>>>>> origin/ROC
 
 # clean data, retrieve 1000 random samples
 cleanedData = preprocess(data, 1000)
 
 # train models
+<<<<<<< HEAD
+knn, dtc = train(cleanedData, kfold, knnlabel, dtclabel)
+=======
 knn, dtc = train(cleanedData, 10, 'explicit', 'mode')
+>>>>>>> origin/ROC
 
 # get test data, retrieve 1000 random samples
 testdata = preprocess(data, 1000)
 
+<<<<<<< HEAD
+# print samples vs accuracy
+samplevsaccuracy(testdata, kfold, knnlabel, dtclabel)
+
+# BEGIN ROC
+# get samples from validation data
+dtcsamples = testdata.drop([dtclabel], axis=1)
+knnsamples = testdata.drop([knnlabel], axis=1)
+
+# get predictions based on validation samples
+dtcpredictions = pd.DataFrame(dtc.predict(dtcsamples), columns=[dtclabel])
+knnpredictions = pd.DataFrame(knn.predict(knnsamples), columns=[knnlabel])
+
+# get probabilities
+dtcprobabilities = pd.DataFrame(dtc.predict_proba(dtcsamples))
+knnprobabilities = pd.DataFrame(knn.predict_proba(knnsamples))
+
+# get tpr and fpr ratios
+dtctpr, dtcfpr = ROCplot(dtcpredictions, dtcprobabilities, dtclabel, thresholds)
+knntpr, knnfpr = ROCplot(knnpredictions, knnprobabilities, knnlabel, thresholds)
+
+# plot ROC curves
+plt.plot(dtcfpr, dtctpr, color='red', label='ROC')
+plt.plot([0, 1], [0, 1], color='blue', linestyle='--')
+plt.xlabel('fpr')
+plt.ylabel('tpr')
+plt.title('DTC')
+plt.show()
+
+plt.plot(knnfpr, knntpr, color='red', label='ROC')
+plt.plot([0, 1], [0, 1], color='blue', linestyle='--')
+plt.xlabel('fpr')
+plt.ylabel('tpr')
+plt.title('KNN')
+plt.show()
+=======
 # create ROC curves for seleclted models on validation data
 ROCplot(knn, testdata, 'explicit', 20, 'KNN')
 ROCplot(dtc, testdata, 'mode', 20, 'DTC')
+>>>>>>> origin/ROC
 
 # get plots of samples vs accuracy for our methodology
 samplevsaccuracy(cleanedData, 10, 'explicit', 'mode')

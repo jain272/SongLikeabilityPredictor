@@ -12,14 +12,14 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 
 
-def preprocess(data_csv):
+def preprocess(data_csv, samples):
     """Code for preprocessing of data"""
     dfMain = pd.read_csv(data_csv)  # Read data from CSV file into Pandas Dataframe
     dfMain = dfMain[['mode', 'energy', 'acousticness', 'valence', 'explicit', 'danceability',
                      'tempo']]  # Dropping all columns except listed ones
     dfMain = dfMain.reindex(sorted(dfMain.columns), axis=1)  # Sort the columns alphabetically
     dfMain.dropna()  # Dropping rows with missing values
-    dfSample = dfMain.sample(n=1000)  # Randomly selecting 1000 rows from the dataframe
+    dfSample = dfMain.sample(n=samples)  # Randomly selecting 1000 rows from the dataframe
     return dfSample
 
 
@@ -38,14 +38,14 @@ def trainkNN(training, labelname, k):
 
 
 # TODO: TUNING
-def trainDecisionTree(training, labelname):
+def trainDTC(training, labelname, depth):
     """Code for training the Decision Tree classifier"""
     # split training data into labels and samples
     explicitLabel = training[[labelname]].to_numpy().reshape(len(training))
     explicitsample = training.drop([labelname], axis=1)
 
     # train decision tree
-    dtc = DecisionTreeClassifier()
+    dtc = DecisionTreeClassifier(max_depth=depth)
     dtc.fit(explicitsample, explicitLabel)
 
     # return model
@@ -66,7 +66,7 @@ def validate(model, validation, labelname):
     return accuracy.sum() / len(accuracy)
 
 
-def samplevsaccuracy(cleanedData):
+def samplevsaccuracy(cleanedData, nfolds, knnlabel, dtclabel):
     """Code for plotting the Accuracy vs Sample Plots for both classifiers"""
     numsampleslistknn = []  # list with number of samples for KNN
     accuracylistknn = []  # list with corresponding accuracies for number of samples for KNN
@@ -83,7 +83,7 @@ def samplevsaccuracy(cleanedData):
         trainingset = trainingsetall.sample(n=(count * 100))
 
         # Train the KNN and Decision Tree on the training set for current iteration
-        bestknn, bestdtc = train(trainingset)
+        bestknn, bestdtc = train(trainingset, nfolds, knnlabel, dtclabel)
 
         # Obtain accuracy for knn classifier on the given dataset
         accuracyknn = validate(bestknn, fixedvalset, 'explicit')
@@ -96,25 +96,58 @@ def samplevsaccuracy(cleanedData):
         accuracylistdtc.append(accuracydtc)
 
     # Plot corresponding lists for the accuracy vs sample plots
-    plt.plot(numsampleslistknn, accuracylistknn)
-    plt.xlabel('Number of Samples')
-    plt.ylabel('Accuracy')
-    plt.title('Accuracy vs Sample Plot for K-Nearest Neighbors')
-    plt.show()
-    plt.plot(numsampleslistdtc, accuracylistdtc)
-    plt.xlabel('Number of Samples')
-    plt.ylabel('Accuracy')
-    plt.title('Accuracy vs Sample Plot for Decision Trees')
+    plot(numsampleslistknn, accuracylistknn, 'Number of Samples', 'Accuracy', 'Accuracy vs Sample Plot for KNN', False)
+    plot(numsampleslistdtc, accuracylistdtc, 'Number of Samples', 'Accuracy', 'Accuracy vs Sample Plot for DTC', False)
+
+
+# plotting helper function
+def plot(x, y, xlab, ylab, title, point):
+    if point:
+        plt.plot(x, y, 'ro')
+    else:
+        plt.plot(x, y)
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    plt.title(title)
     plt.show()
 
 
-def train(cleanedData):
+def ROC(validation, predictions, label, threshold):
+    # get indices which fall above threshold
+    predictions = pd.DataFrame(np.where(predictions[1] >= threshold, 1, 0), columns=[label])
+
+    # true positives, true negatives, false positives, false negatives
+    tp = np.where((validation[label].reset_index(drop=True) == 1) & (predictions[label] == 1), 1, 0).sum()
+    tn = np.where((validation[label].reset_index(drop=True) == 0) & (predictions[label] == 0), 1, 0).sum()
+    fp = np.where((validation[label].reset_index(drop=True) == 0) & (predictions[label] == 1), 1, 0).sum()
+    fn = np.where((validation[label].reset_index(drop=True) == 1) & (predictions[label] == 0), 1, 0).sum()
+
+    # true positive rate
+    tpr = (tp+1)/(tp+fn+1)
+
+    # false positive rate
+    fpr = (fp+1)/(fp+tn+1)
+
+    return tpr, fpr
+
+
+def ROCplot(actual, predicted, label, thresholds):
+    rtpr = []
+    rfpr = []
+
+    for threshold in thresholds:
+        tpr, fpr = ROC(actual, predicted, label, threshold)
+        rtpr.append(tpr)
+        rfpr.append(fpr)
+
+    return rtpr, rfpr
+
+
+def train(cleanedData, nfolds, knnlabel, dtclabel):
     """Umbrella function for the training process"""
-    knnlabel = 'explicit'
-    dtclabel = 'mode'
     knnmaxacc = dtcmaxacc = 0
     bestknn = bestdtc = None
-    nfolds = 10
+
     n = len(cleanedData)
 
     for i in range(0, n, int(n / nfolds)):
@@ -126,30 +159,74 @@ def train(cleanedData):
         # drop entries in validation ser from training set
         trainingset = cleanedData.drop(validationset.isin(cleanedData).index)
 
-        # train knn and save most accurate model
-        currmodel = trainkNN(trainingset, knnlabel, 5)
-        accuracy = validate(currmodel, validationset, knnlabel)
-        if accuracy > knnmaxacc:
-            knnmaxacc = accuracy
-            bestknn = currmodel
+        # tune K, begin at 5 and go to 50 in increments of 5
+        for c in range(1, nfolds+1):
+            # train knn and save most accurate model
+            currmodel = trainkNN(trainingset, knnlabel, 5*c)
+            accuracy = validate(currmodel, validationset, knnlabel)
+            if accuracy > knnmaxacc:
+                knnmaxacc = accuracy
+                bestknn = currmodel
 
-        # train decision tree and save most accurate model
-        currmodel = trainDecisionTree(trainingset, dtclabel)
-        accuracy = validate(currmodel, validationset, dtclabel)
-        if accuracy > dtcmaxacc:
-            dtcmaxacc = accuracy
-            bestdtc = currmodel
+        # tune max depth, begin at 5 and go to 50 by 5
+        for c in range(1, nfolds+1):
+            # train decision tree and save most accurate model
+            currmodel = trainDTC(trainingset, dtclabel, 5*c)
+            accuracy = validate(currmodel, validationset, dtclabel)
+            if accuracy > dtcmaxacc:
+                dtcmaxacc = accuracy
+                bestdtc = currmodel
+    # Plot corresponding lists for the accuracy vs sample plots
+
     return bestknn, bestdtc
 
-
+# get data
 data = "./archive/data.csv"
-cleanedData = preprocess(data)
-knn, dtc = train(cleanedData)
+dtclabel = 'mode'
+knnlabel ='explicit'
+kfold = 10
+thresholds = [0, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1]
 
-testdata = preprocess(data)
-print('dtc')
-print(validate(dtc, testdata, 'mode'))
-print('knn')
-print(validate(knn, testdata, 'explicit'))
+# clean data, retrieve 1000 random samples
+cleanedData = preprocess(data, 1000)
 
-samplevsaccuracy(cleanedData)
+# train models
+knn, dtc = train(cleanedData, kfold, knnlabel, dtclabel)
+
+# get test data, retrieve 1000 random samples
+testdata = preprocess(data, 1000)
+
+# print samples vs accuracy
+samplevsaccuracy(testdata, kfold, knnlabel, dtclabel)
+
+# BEGIN ROC
+# get samples from validation data
+dtcsamples = testdata.drop([dtclabel], axis=1)
+knnsamples = testdata.drop([knnlabel], axis=1)
+
+# get predictions based on validation samples
+dtcpredictions = pd.DataFrame(dtc.predict(dtcsamples), columns=[dtclabel])
+knnpredictions = pd.DataFrame(knn.predict(knnsamples), columns=[knnlabel])
+
+# get probabilities
+dtcprobabilities = pd.DataFrame(dtc.predict_proba(dtcsamples))
+knnprobabilities = pd.DataFrame(knn.predict_proba(knnsamples))
+
+# get tpr and fpr ratios
+dtctpr, dtcfpr = ROCplot(dtcpredictions, dtcprobabilities, dtclabel, thresholds)
+knntpr, knnfpr = ROCplot(knnpredictions, knnprobabilities, knnlabel, thresholds)
+
+# plot ROC curves
+plt.plot(dtcfpr, dtctpr, color='red', label='ROC')
+plt.plot([0, 1], [0, 1], color='blue', linestyle='--')
+plt.xlabel('fpr')
+plt.ylabel('tpr')
+plt.title('DTC')
+plt.show()
+
+plt.plot(knnfpr, knntpr, color='red', label='ROC')
+plt.plot([0, 1], [0, 1], color='blue', linestyle='--')
+plt.xlabel('fpr')
+plt.ylabel('tpr')
+plt.title('KNN')
+plt.show()

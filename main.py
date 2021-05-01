@@ -12,14 +12,14 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 
 
-def preprocess(data_csv):
+def preprocess(data_csv, samples):
     """Code for preprocessing of data"""
     dfMain = pd.read_csv(data_csv)  # Read data from CSV file into Pandas Dataframe
     dfMain = dfMain[['mode', 'energy', 'acousticness', 'valence', 'explicit', 'danceability',
                      'tempo']]  # Dropping all columns except listed ones
     dfMain = dfMain.reindex(sorted(dfMain.columns), axis=1)  # Sort the columns alphabetically
     dfMain.dropna()  # Dropping rows with missing values
-    dfSample = dfMain.sample(n=1000)  # Randomly selecting 1000 rows from the dataframe
+    dfSample = dfMain.sample(n=samples)  # Randomly selecting 1000 rows from the dataframe
     return dfSample
 
 
@@ -125,8 +125,8 @@ def ROC(model, validation, label):
     # true positives, true negatives, false positives, false negatives
     tp = np.where((validation[label].reset_index(drop=True) == 1) & (predictions[label] == 1), 1, 0).sum()
     tn = np.where((validation[label].reset_index(drop=True) == 0) & (predictions[label] == 0), 1, 0).sum()
-    fp = np.where((validation[label].reset_index(drop=True) != 0) & (predictions[label] == 1), 1, 0).sum()
-    fn = np.where((validation[label].reset_index(drop=True) != 1) & (predictions[label] == 0), 1, 0).sum()
+    fp = np.where((validation[label].reset_index(drop=True) == 0) & (predictions[label] == 1), 1, 0).sum()
+    fn = np.where((validation[label].reset_index(drop=True) == 1) & (predictions[label] == 0), 1, 0).sum()
 
     # true positive rate
     tpr = tp/(tp+fn)
@@ -134,6 +134,7 @@ def ROC(model, validation, label):
     fpr = fp/(fp+tn)
 
     return tpr, fpr
+
 
 def ROCplot(model, testdata, label, nfolds, modelname):
     rtpr = []
@@ -146,7 +147,12 @@ def ROCplot(model, testdata, label, nfolds, modelname):
         rtpr.append(tpr)
         rfpr.append(fpr)
 
-    plot(rfpr, rtpr, 'fpr', 'tpr', modelname, True)
+    plt.plot(rfpr, rtpr, color='red', label='ROC')
+    plt.plot([0, 1], [0, 1], color='blue', linestyle='--')
+    plt.xlabel('fpr')
+    plt.ylabel('tpr')
+    plt.title(modelname)
+    plt.show()
 
 
 def train(cleanedData, nfolds, knnlabel, dtclabel):
@@ -184,19 +190,25 @@ def train(cleanedData, nfolds, knnlabel, dtclabel):
 
     return bestknn, bestdtc
 
-
+# get data
 data = "./archive/data.csv"
-cleanedData = preprocess(data)
+
+# clean data, retrieve 1000 random samples
+cleanedData = preprocess(data, 1000)
+
+# train models
 knn, dtc = train(cleanedData, 10, 'explicit', 'mode')
 
-testdata = preprocess(data)
-print('dtc')
+# get test data, retrieve 1000 random samples
+testdata = preprocess(data, 1000)
+
+# create ROC curves for seleclted models on validation data
+ROCplot(knn, testdata, 'explicit', 20, 'KNN')
+ROCplot(dtc, testdata, 'mode', 20, 'DTC')
+
+# get plots of samples vs accuracy for our methodology
+samplevsaccuracy(cleanedData, 10, 'explicit', 'mode')
+
+# validate data, print accuracy
 print(validate(dtc, testdata, 'mode'))
-print('knn')
 print(validate(knn, testdata, 'explicit'))
-
-samplevsaccuracy(testdata, 10, 'explicit', 'mode')
-ROCplot(knn, testdata, 'explicit', 10, 'KNN')
-ROCplot(dtc, testdata, 'mode', 10, 'DTC')
-
-

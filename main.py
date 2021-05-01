@@ -131,11 +131,7 @@ def ROC(validation, predictions, label, threshold):
     return tpr, fpr
 
 
-<<<<<<< HEAD
 def ROCplot(actual, predicted, label, thresholds):
-=======
-def ROCplot(model, testdata, label, nfolds, modelname):
->>>>>>> origin/ROC
     rtpr = []
     rfpr = []
 
@@ -144,16 +140,7 @@ def ROCplot(model, testdata, label, nfolds, modelname):
         rtpr.append(tpr)
         rfpr.append(fpr)
 
-<<<<<<< HEAD
     return rtpr, rfpr
-=======
-    plt.plot(rfpr, rtpr, color='red', label='ROC')
-    plt.plot([0, 1], [0, 1], color='blue', linestyle='--')
-    plt.xlabel('fpr')
-    plt.ylabel('tpr')
-    plt.title(modelname)
-    plt.show()
->>>>>>> origin/ROC
 
 
 def train(cleanedData, nfolds, knnlabel, dtclabel):
@@ -195,28 +182,20 @@ def train(cleanedData, nfolds, knnlabel, dtclabel):
 
 # get data
 data = "./archive/data.csv"
-<<<<<<< HEAD
 dtclabel = 'mode'
 knnlabel ='explicit'
 kfold = 10
 thresholds = [0, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1]
-=======
->>>>>>> origin/ROC
 
 # clean data, retrieve 1000 random samples
 cleanedData = preprocess(data, 1000)
 
 # train models
-<<<<<<< HEAD
 knn, dtc = train(cleanedData, kfold, knnlabel, dtclabel)
-=======
-knn, dtc = train(cleanedData, 10, 'explicit', 'mode')
->>>>>>> origin/ROC
 
 # get test data, retrieve 1000 random samples
 testdata = preprocess(data, 1000)
 
-<<<<<<< HEAD
 # print samples vs accuracy
 samplevsaccuracy(testdata, kfold, knnlabel, dtclabel)
 
@@ -251,15 +230,3 @@ plt.xlabel('fpr')
 plt.ylabel('tpr')
 plt.title('KNN')
 plt.show()
-=======
-# create ROC curves for seleclted models on validation data
-ROCplot(knn, testdata, 'explicit', 20, 'KNN')
-ROCplot(dtc, testdata, 'mode', 20, 'DTC')
->>>>>>> origin/ROC
-
-# get plots of samples vs accuracy for our methodology
-samplevsaccuracy(cleanedData, 10, 'explicit', 'mode')
-
-# validate data, print accuracy
-print(validate(dtc, testdata, 'mode'))
-print(validate(knn, testdata, 'explicit'))
